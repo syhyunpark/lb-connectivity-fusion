@@ -20,7 +20,6 @@ This repository contains a minimal set of standalone scripts for:
 - `make_elbow_figure.py` — rank-selection elbow plots
 - `run_synergy_analysis.py` — nested-CV prediction / multimodal synergy analysis
 - `run_behavior_associations.py` — univariate association screening
-- `make_age_assoc_outputs.py` — manuscript-ready association figures and tables
 - `plot_scale_frequency_signature.py` — scale–frequency summary figure
 - `roi_top_labels_schaefer_fsaverage5.py` — Schaefer ROI top-label extraction
 - `roi_system_interpretability_from_BI.py` — Schaefer-7 system composition summaries
@@ -110,7 +109,16 @@ This repository provides the core model-fitting, feature-extraction, and figure-
 The simulation results in the paper are based on repeated synthetic-data generation followed by fitting and evaluation across:
 -	different true ranks; different EEG spatial cutoffs; and different signal-to-noise ratios.
 
-A typical fixed-rank fit is:
+
+The repository includes the main simulation scripts used in the manuscript:
+
+- `sim_generate_cov.py` — generate synthetic LB-domain EEG–fMRI connectivity data
+- `eval_fit_cov.py` — evaluate fitted models against the simulation truth (recovery and reconstruction evaluation)
+- `analyze_ard_results.py` — summarize ARD-based rank-selection results
+- `analyze_oracle_results.py` — summarize oracle-rank estimation results
+
+
+A typical fixed-rank fit given the simulated data is:
 ```bash
 python fit_map_fixedR_cov_fast.py \
   --data sim_data.npz \
@@ -137,6 +145,8 @@ python fit_map_fixedR_cov_fast.py \
 ARD-based rank screening can be analyzed with:
 - analyze_ard_results.py
 - make_elbow_figure.py
+
+
 
 ### MPI–LEMON application
 
