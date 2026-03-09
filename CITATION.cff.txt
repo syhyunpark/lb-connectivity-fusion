@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite the software."
+title: "lb-connectivity-fusion"
+authors:
+  - family-names: "Park"
+    given-names: "Hyung G."
+repository-code: "https://github.com/syhyunpark/lb-connectivity-fusion"
+license: "MIT"
+abstract: >
+  Code accompanying the paper
+  "Bandwidth-aware fusion of resting-state EEG–fMRI connectivity in cortical eigenmode space".
+keywords:
+  - EEG
+  - fMRI
+  - connectivity
+  - cortical eigenmodes
+  - Laplace-Beltrami
+  - multimodal fusion
