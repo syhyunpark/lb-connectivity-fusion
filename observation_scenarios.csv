@@ -1,0 +1,11 @@
+scenario_id,generator_scenario,summary_snr,k0_phi,mask,eeg_candidate_modes,topology_angle_deg,fit_variants,role
+oracle_snr1,direct_covariance,1,12,hard,20,0,fused,Model-congruent oracle at equal signal/noise energy
+oracle_snr4,direct_covariance,4,12,hard,20,0,fused,Model-congruent oracle at higher information
+raw_aecov_snr1,observation,1,12,hard,20,0,fused,Amplitude-envelope EEG and HRF/BOLD fMRI observation pipeline
+raw_aecov_snr4,observation,4,12,hard,20,0,clean_fused;fused;eeg_only;fmri_only,Primary observation pipeline plus clean and modality ablations
+raw_aecov_smooth_snr4,observation,4,12,smooth,30,0,fused,Smooth EEG reliability taper
+raw_aecov_broadtruth_snr4,observation,4,30,hard,20,0,fused;eeg_only;fmri_only,Broader generating spatial spectrum
+freq_rotation_30deg_snr4,freq_rotation,4,12,hard,20,30,fused,Gradual EEG band-specific rotation from 0 to 30 degrees
+crossmodal_divergence_15deg,crossmodal_divergence,4,12,hard,20,15,fused,Mild EEG-fMRI spatial disagreement
+crossmodal_divergence_30deg,crossmodal_divergence,4,12,hard,20,30,fused,Moderate EEG-fMRI spatial disagreement
+crossmodal_divergence_60deg,crossmodal_divergence,4,12,hard,20,60,fused,Strong EEG-fMRI disagreement / negative-control endpoint
