@@ -59,7 +59,7 @@ def main() -> None:
     ap.add_argument('--data', default='lemon_eo_model_inputs.npz')
     ap.add_argument('--out', default='refit_lemon_eo_R12.npz')
     ap.add_argument('--rank', type=int, default=12)
-    ap.add_argument('--n-starts', type=int, default=10)
+    ap.add_argument('--n-starts', type=int, default=1)
     ap.add_argument('--max-iter', type=int, default=50)
     ap.add_argument('--tol', type=float, default=1e-7)
     ap.add_argument('--alpha-lambda', type=float, default=1.0)
