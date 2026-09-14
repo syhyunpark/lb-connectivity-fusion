@@ -140,7 +140,9 @@ python3 rank_screening_summary.py \
 
 
 
-## MPI–LEMON analysis: Refit the primary representation
+## MPI–LEMON analysis
+
+## Refit the primary representation
 
 ```bash
 python3 fit_lemon_model.py
@@ -184,7 +186,7 @@ python3 cca_prediction_benchmark.py
 
 
 
-### Real-data representation robustness analysis
+### Representation robustness analysis
 
 Create the K=50 EEG-support and band-specific sensitivity inputs:
 
