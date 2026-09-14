@@ -7,8 +7,10 @@ The model represents modality-specific connectivity summaries in common
 Laplace--Beltrami (LB) coordinates using shared orthonormal spatial factors
 Phi and separate nonnegative modality-specific strengths. EEG strengths are
 frequency resolved; fMRI strengths are modality specific.
- 
 
+The same implementation can also
+be used by the simulation scripts, including adaptive ARD-motivated rank
+screening.
 """
 import argparse
 from dataclasses import dataclass
@@ -25,14 +27,13 @@ except Exception:
     _HAS_JOBLIB = False
 
  
-# Helpers
-# -------------------------
-def sym(A: np.ndarray) ->  np.ndarray:
-    return 0.5 * (A +  A.T)
+# Helpers 
+def sym(A: np.ndarray) -> np.ndarray:
+    return 0.5 * (A + A.T)
 
 
 def project_tangent(Phi: np.ndarray, G: np.ndarray) -> np.ndarray:
-    # Riemannian gradient on Stiefel 
+    # Riemannian gradient on Stiefel: G - Phi sym(Phi^T G)
     return G - Phi @ sym(Phi.T @ G)
 
 
@@ -49,32 +50,40 @@ def sigma_from_Phi_lambda(Phi: np.ndarray, lam: np.ndarray) -> np.ndarray:
 def _frob(A: np.ndarray) -> float:
     return float(np.sqrt(np.sum(A * A)))
 
-
  
 # Small caches: (F,R) -> (D, Ksmooth)
-# -- 
+# ---- 
 _CACHE_DR: Dict[Tuple[int, int], Tuple[np.ndarray, np.ndarray]] = {}
 
 
 def get_D_Ksmooth(F: int, R: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Return the second-difference operator used for EEG spectral smoothing.
+
+    For F >= 3, D has shape (F-2, F) and computes second differences across
+    frequency bins. For F < 3, no second difference is defined, so we return
+    empty operators. 
+    """
     key = (F, R)
     if key in _CACHE_DR:
         return _CACHE_DR[key]
+    if F < 1:
+        raise ValueError("Need F>=1")
     if F < 3:
-        raise ValueError("Need F>=3")
-    D = np.zeros((F - 2, F), dtype=float)
-    for i in range(F - 2):
-        D[i, i] = 1.0
-        D[i, i + 1] = -2.0
-        D[i, i + 2] = 1.0
-    Ksmooth = np.kron(D, np.eye(R))  #   ((F-2)R, FR)  frequency-major
+        D = np.zeros((0, F), dtype=float)
+        Ksmooth = np.zeros((0, F * R), dtype=float)
+    else:
+        D = np.zeros((F - 2, F), dtype=float)
+        for i in range(F - 2):
+            D[i, i] = 1.0
+            D[i, i + 1] = -2.0
+            D[i, i + 2] = 1.0
+        Ksmooth = np.kron(D, np.eye(R))  # ((F-2)R, FR), frequency-major
     _CACHE_DR[key] = (D, Ksmooth)
     return D, Ksmooth
 
 
  
-# Config
-# -------------------------
+# Config 
 FMriMode = Literal["aggregate", "separate"]
 SortMode = Literal["none", "median", "mean"]
 InitExpand = Literal["random", "fmri_eig"]
@@ -88,12 +97,12 @@ class FitConfig:
     alpha_lambda: float = 0.0
     alpha0: float = 1e-6
 
-    # modality weights  (allow 0 for single-modality fits)
+    # modality weights (allow 0 for single-modality fits)
     w_eeg: float = -1.0   # default 1/F
     w_fmri: float = 1.0
 
     # fMRI observation mode
-    fmri_mode: FMriMode = "aggregate"   #  DEFAULT keeps simulation identical
+    fmri_mode: FMriMode = "aggregate"   # DEFAULT keeps simulation identical
 
     # Phi update
     step_phi: float = 1e-2
@@ -106,12 +115,12 @@ class FitConfig:
     enforce_monotone: bool = True
 
     # lambda solver
-    lam_solver: str = "bvls"   #  "lsq" or "bvls"
+    lam_solver: str = "bvls"   # "lsq" or "bvls"
 
     # parallel lambda solves
     n_jobs: int = 1
 
-    # ----- ARD options 
+    # ----- ARD options  
     use_ard: bool = False
     Rmax: int = 15
     ard_a: float = 1e-6
@@ -122,10 +131,10 @@ class FitConfig:
     ard_tau_ceiling: float = 1e9
     ard_energy_rel_thresh: float = 1e-2
 
-    #  end-of-fit sorting  
+    #  end-of-fit sorting 
     sort_factors: SortMode = "none"  # default none => simulation outputs unchanged
 
-    #  init Phi from an anchor fit 
+    # init Phi from an anchor fit  
     init_fit: str = ""              # path to .npz with Phi_hat
     init_expand: InitExpand = "random"
     init_seed: int = 0
@@ -134,9 +143,8 @@ class FitConfig:
 
     verbose: bool = True
 
-
  
-#   Edge compression 
+# Edge compression 
 def get_edge_indices(W: np.ndarray, include_diag: bool) -> Tuple[Tuple[np.ndarray, np.ndarray], np.ndarray]:
     K = W.shape[0]
     iu = np.triu_indices(K, k=0 if include_diag else 1)
@@ -148,7 +156,7 @@ def get_edge_indices(W: np.ndarray, include_diag: bool) -> Tuple[Tuple[np.ndarra
 
 def build_A_columns(Phi: np.ndarray, W: np.ndarray, iu, keep: np.ndarray) -> np.ndarray:
     """Compressed symmetric design equivalent to the full Frobenius norm."""
-    _, R =  Phi.shape
+    _, R = Phi.shape
     frob_w = np.where(iu[0] == iu[1], 1.0, np.sqrt(2.0))
     cols = []
     for r in range(R):
@@ -196,17 +204,17 @@ def lambda_update_all_subjects(
 ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
     """
     Returns:
-      lambdas_eeg:   (n, F, R)
+      lambdas_eeg:  (n, F, R)
       lambdas_fmri: (n, R) if fmri_mode='separate' else None
     """
     n, F, K, _ = C_eeg.shape
     R = Phi.shape[1]
 
-    w_eeg =  (1.0 / F) if cfg.w_eeg < 0 else float(cfg.w_eeg)
-    w_fmri =  float(cfg.w_fmri)
+    w_eeg = (1.0 / F) if cfg.w_eeg < 0 else float(cfg.w_eeg)
+    w_fmri = float(cfg.w_fmri)
 
     use_eeg = (w_eeg > 0.0)
-    use_fmri =  (w_fmri > 0.0)
+    use_fmri = (w_fmri > 0.0)
 
     seeg = (np.sqrt(w_eeg) / sigma_eeg) if use_eeg else 0.0
     sfmri = (np.sqrt(w_fmri) / sigma_fmri) if use_fmri else 0.0
@@ -225,7 +233,7 @@ def lambda_update_all_subjects(
     Eeeg = eeg_keep.size
     Efmri = fmri_keep.size
 
-    #  smoothness penalty only for EEG part; pad zeros if separate
+    # smoothness penalty only for EEG part; pad zeros if separate
     _, Ksmooth = get_D_Ksmooth(F, R)  # ((F-2)R, FR)
     if separate:
         Ksmooth_full = np.hstack([Ksmooth, np.zeros((Ksmooth.shape[0], R), dtype=float)])
@@ -251,7 +259,6 @@ def lambda_update_all_subjects(
             A_eeg_block[f * Eeeg:(f + 1) * Eeeg, f * R:(f + 1) * R] = A_eeg
         A_blocks.append(seeg * A_eeg_block)
         y_layout.append(("eeg", F * Eeeg))
-
 
     if use_fmri:
         A_fmri = build_A_columns(Phi, W_fmri, iu, fmri_keep)  # (Efmri,R)
@@ -285,8 +292,8 @@ def lambda_update_all_subjects(
                 Cf_u = C_fmri[i][iu0, iu1]
                 Cf_u = Cf_u[fmri_keep]
                 y_fm = Wfmri_u_keep * Cf_u
-                y[pos:pos + length] = sfmri * y_fm
-                pos += length
+                y[pos:pos + length] =  sfmri * y_fm
+                pos +=  length
         return y
 
     def solve_one(i: int) -> Tuple[np.ndarray, Optional[np.ndarray]]:
@@ -303,7 +310,6 @@ def lambda_update_all_subjects(
     lambdas_eeg = np.stack([t[0] for t in out_list], axis=0)
     lambdas_fmri = np.stack([t[1] for t in out_list], axis=0) if separate else None
     return lambdas_eeg, lambdas_fmri
-
 
  
 # Lambda penalties 
@@ -323,31 +329,30 @@ def lambda_penalties(
         for i in range(n):
             for r in range(R):
                 dv = D @ lambdas_eeg[i, :, r]
-                pen +=  alpha_lambda * float(dv @ dv)
+                pen += alpha_lambda * float(dv @ dv)
 
     if use_ard:
         if tau is None:
             raise ValueError("use_ard=True but tau is None.")
         energy_r = np.sum(lambdas_eeg * lambdas_eeg, axis=(0, 1))
         if lambdas_fmri is not None:
-            energy_r = energy_r +  np.sum(lambdas_fmri * lambdas_fmri, axis=0)
+            energy_r = energy_r + np.sum(lambdas_fmri * lambdas_fmri, axis=0)
         pen += float(np.sum(tau * energy_r))
     else:
         if alpha0 > 0:
             pen += alpha0 * float(np.sum(lambdas_eeg * lambdas_eeg))
             if lambdas_fmri is not None:
-                pen +=  alpha0 * float(np.sum(lambdas_fmri * lambdas_fmri))
+                pen += alpha0 * float(np.sum(lambdas_fmri * lambdas_fmri))
 
     return float(pen)
 
-
  
-# Data-fit and gradient 
+# Data-fit + gradient 
 def datafit_and_grad(
     C_eeg, C_fmri, Phi, lambdas_eeg, lambdas_fmri, W_eeg, W_fmri, F_fmri, w_f,
     sigma_eeg, sigma_fmri, w_eeg, w_fmri, fmri_mode: FMriMode
 ) -> Tuple[float, np.ndarray]:
-    n, F, K, _ = C_eeg.shape
+    n, F, K, _ =  C_eeg.shape
     Rdim = Phi.shape[1]
 
     use_eeg = (w_eeg > 0.0)
@@ -359,7 +364,7 @@ def datafit_and_grad(
     for i in range(n):
         if use_eeg:
             for f in range(F):
-                lam =  lambdas_eeg[i, f]
+                lam = lambdas_eeg[i, f]
                 S = sigma_from_Phi_lambda(Phi, lam)
                 resid = S - C_eeg[i, f]
                 Rm = W_eeg * resid
@@ -438,10 +443,8 @@ def effective_rank_energy(
     keep = (E / (Emax + 1e-12)) >= rel_thresh
     return int(np.sum(keep)), E
 
-
  
-#   end-of-fit factor sorting (Optional)
-# -------------------------ss
+#  end-of-fit factor sorting (optional) 
 def factor_energy_for_sort(
     lambdas_eeg: np.ndarray,
     lambdas_fmri: Optional[np.ndarray],
@@ -489,7 +492,7 @@ def apply_factor_permutation(
     return Phi2, lam2, lamf2, tau2
 
  
-# init Phi from an anchor fit ( Optional) 
+#   init Phi from an anchor fit (optional) 
 def init_phi_from_anchor(
     data: Dict[str, np.ndarray],
     R: int,
@@ -512,7 +515,7 @@ def init_phi_from_anchor(
     if R0 > R:
         return qr_retraction(Phi0[:, :R])
 
-    #  Need to expand to larger rank
+    # Need to expand to larger rank
     need = R - R0
     if expand == "random":
         rng = np.random.default_rng(seed)
@@ -546,7 +549,6 @@ def init_phi_from_anchor(
     return qr_retraction(Phi_init)
 
  
-
 # Main fit
 # -------------------------
 def fit_model(data: Dict[str, np.ndarray], cfg: FitConfig) -> Dict[str, np.ndarray]:
@@ -637,14 +639,12 @@ def fit_model(data: Dict[str, np.ndarray], cfg: FitConfig) -> Dict[str, np.ndarr
             lambdas_eeg, cfg.alpha_lambda, cfg.alpha0, cfg.use_ard, tau_old, lambdas_fmri
         )
 
-
         # (C) data-fit + grad
         J_data, G = datafit_and_grad(
             C_eeg, C_fmri, Phi, lambdas_eeg, lambdas_fmri, W_eeg, W_fmri, F_fmri, w_f,
             sigma_eeg, sigma_fmri, w_eeg, w_fmri, cfg.fmri_mode
         )
         J_curr = J_data + pen_const
-
 
         # (D) Phi step + backtracking
         G = project_tangent(Phi, G)
@@ -695,8 +695,7 @@ def fit_model(data: Dict[str, np.ndarray], cfg: FitConfig) -> Dict[str, np.ndarr
         if rel < cfg.tol:
             break
  
-    # end-of-fit sorting (optional; 
-    # -------------------------
+    # end-of-fit sorting (optional ) 
     sort_order = np.arange(R)
     sort_energy = None
     if cfg.sort_factors != "none":
@@ -784,11 +783,11 @@ def main():
     ap.add_argument("--ard_tau_ceiling", type=float, default=1e9)
     ap.add_argument("--ard_energy_rel_thresh", type=float, default=1e-2)
 
-    #   end-of-fit sorting (off by default)
+    # Optional: end-of-fit sorting (off by default)
     ap.add_argument("--sort_factors", type=str, default="none", choices=["none", "median", "mean"],
                     help="End-of-fit factor sorting for stable indexing (reporting only). Default none.")
 
-    # Optional:  init from anchor fit
+    # init from anchor fit ( Optional 
     ap.add_argument("--init_fit", type=str, default="", help="Warm-start Phi from an anchor fit .npz (truncate/expand).")
     ap.add_argument("--init_expand", type=str, default="random", choices=["random", "fmri_eig"],
                     help="If init_fit has fewer factors than needed, how to expand.")

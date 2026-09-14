@@ -23,7 +23,9 @@ See `DATA_DICTIONARY.md` for details.
 
 ## Model 
 
-EEG and fMRI are first represented in the same (fsaverage5 template-based) cortical Laplace–Beltrami (LB) coordinates, and treated as distinct modality-specific measurements. The model then learns common spatial factors while estimating separate subject-level EEG and fMRI strength parameters. EEG strengths are additionally resolved over frequency.
+EEG and fMRI are first represented in the same template-based cortical Laplace–Beltrami (LB) coordinates, and treated as distinct modality-specific measurements. 
+
+The model then learns common spatial factors while estimating separate subject-level EEG and fMRI strength parameters. EEG strengths are additionally resolved over frequency.
  
 
 ## Quick check
@@ -94,48 +96,6 @@ modality-specific subject strengths, and  EEG/fMRI connectivity
 matrices.
 
 
-
-## Refit the primary representation
-
-```bash
-python3 fit_lemon_model.py
-```
-
-This refits the `R=12` eyes-open model from the dataset `lemon_eo_model_inputs.npz`.
-
-The exact fitted representation used in the manuscript is provided as `lemon_eo_fitted_representation.npz`. (Because the optimization is nonconvex, an independent refit can converge to a different local solution.)
-
-## Main analyses
-
-### Cross-validated age prediction
-
-Eyes-open analysis:
-
-```bash
-python3 prediction_analysis.py --condition EO
-```
-
-Eyes-closed sensitivity analysis:
-
-```bash
-python3 prediction_analysis.py --condition EC
-```
-
-Summarize prediction performance and paired bootstrap comparisons:
-
-```bash
-python3 prediction_summary.py \
-  --prediction_csvs prediction_results/EO/R12/all_predictions.csv \
-  --outdir prediction_summary \
-  --n_boot 10000
-```
-
-PCA-regularized CCA benchmark:
-
-```bash
-python3 cca_prediction_benchmark.py
-```
-
 ### Modality-specific signal-generation simulation
 
 Run the simulation grid used to test recovery under distinct EEG and fMRI observation procedures:
@@ -178,6 +138,52 @@ python3 rank_screening_summary.py \
   --outdir rank_screening_summary
 ```
 
+
+
+## MPI–LEMON analysis: Refit the primary representation
+
+```bash
+python3 fit_lemon_model.py
+```
+
+This refits the `R=12` eyes-open model from the dataset `lemon_eo_model_inputs.npz`.
+
+The exact fitted representation used in the manuscript is provided as `lemon_eo_fitted_representation.npz`. 
+
+
+## Main analyses
+
+### Cross-validated age prediction
+
+Eyes-open analysis:
+
+```bash
+python3 prediction_analysis.py --condition EO
+```
+
+Eyes-closed sensitivity analysis:
+
+```bash
+python3 prediction_analysis.py --condition EC
+```
+
+Summarize prediction performance and paired bootstrap comparisons:
+
+```bash
+python3 prediction_summary.py \
+  --prediction_csvs prediction_results/EO/R12/all_predictions.csv \
+  --outdir prediction_summary \
+  --n_boot 10000
+```
+
+PCA-regularized CCA benchmark:
+
+```bash
+python3 cca_prediction_benchmark.py
+```
+
+
+
 ### Real-data representation robustness analysis
 
 Create the K=50 EEG-support and band-specific sensitivity inputs:
@@ -186,13 +192,28 @@ Create the K=50 EEG-support and band-specific sensitivity inputs:
 python3 representation_robustness.py make-inputs
 ```
 
-Compare an alternative fitted representation with the primary fit:
+Compare an alternative fitted representation with the primary fit. 
+
+For example, refit the model using a hard EEG spatial support through the first 15 LB modes rather than the primary first-20 support:
+```bash
+python3 fit_lemon_model.py \
+  --data robustness_inputs/eeg_hard15.npz \
+  --out robustness_hard15_fit.npz \
+  --rank 12 \
+  --n-starts 1 \
+  --max-iter 50 \
+  --tol 1e-7 \
+  --workdir robustness_hard15_work
+```
+
+Compare the resulting representation with the primary fit:
 
 ```bash
 python3 representation_robustness.py compare \
-  --alternative alternative_fit.npz \
-  --output representation_comparison.csv
-```
+  --alternative robustness_hard15_fit.npz \
+  --output representation_comparison_hard15.csv
+``` 
+
 
 ### Age-association robustness analysis
 
