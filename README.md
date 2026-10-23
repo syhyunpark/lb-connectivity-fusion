@@ -243,3 +243,10 @@ The code and documentation use the [MIT License](LICENSE).
 The released data and fitted outputs use
 [PDDL 1.0](https://opendatacommons.org/licenses/pddl/1-0/);
 see [DATA_DICTIONARY.md](DATA_DICTIONARY.md) for details.
+
+
+## Archived manuscript version
+
+The code and derived-data snapshot accompanying the manuscript is archived in Zenodo: https://doi.org/10.5281/zenodo.23603592 
+
+This GitHub repository may contain subsequent updates.
