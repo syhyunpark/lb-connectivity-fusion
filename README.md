@@ -235,3 +235,11 @@ python3 gamma_centroid_sensitivity.py
 ## Citation
 
 Please cite the manuscript and the original MPI–LEMON dataset when using these derived data or analysis code.
+
+
+## License
+
+The code and documentation use the [MIT License](LICENSE).
+The released data and fitted outputs use
+[PDDL 1.0](https://opendatacommons.org/licenses/pddl/1-0/);
+see [DATA_DICTIONARY.md](DATA_DICTIONARY.md) for details.
