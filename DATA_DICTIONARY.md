@@ -117,3 +117,19 @@ Each eligible subject is assigned to exactly one of the five outer folds. The sa
 ### `npz_data_dictionary.csv`
 
 Lists every key, array shape, and dtype contained in the NPZ files. 
+
+
+## Data license and attribution
+
+The released `lemon_*.npz`, `lemon_*.csv`, and
+`prediction_outer_folds.csv` files are provided under
+[PDDL 1.0](https://opendatacommons.org/licenses/pddl/1-0/).
+This applies to rights held by the contributor; third-party rights are unchanged.
+
+These files contain derived MPI–LEMON data and fitted outputs, not the
+original MRI or EEG recordings. The
+[original MPI–LEMON INDI release](https://fcon_1000.projects.nitrc.org/indi/retro/MPI_LEMON.html)
+also lists PDDL as its data-sharing license.
+
+Please cite the accompanying manuscript and
+[Babayan et al. (2019), Scientific Data, 6, 180308](https://doi.org/10.1038/sdata.2018.308).
